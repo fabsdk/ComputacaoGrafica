@@ -6,82 +6,25 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
+
 #include "Mesh.h"
+#include "Shader.h"
+#include "Window.h"
 
-
-void error_glfw(int error, const char* desc) {
-	printf("%d: %s", error, desc);
-}
-
-GLuint shaderProgram;
 std::vector<Mesh*> meshList;
+std::vector<Shader*> shaderList;
+Window* window;
 
-static const char* vShader = "               \n\
-#version 330                                  \n\
-                                              \n\
-layout(location=0) in vec3 pos;               \n\
-uniform mat4 model;							  \n\
-out vec4 vColor;							  \n\
-                                              \n\
-void main(){                                  \n\
-  gl_Position = model * vec4(pos, 1.0);		  \n\
-  vColor = vec4(clamp(pos, 0.0f, 1.0f), 1.0f);\n\
-}                                             \n\
-";
+static const char* vertexLocation = "VertexShader.glsl";
+static const char* fragmentLocation = "FragmentShader.glsl";
 
-static const char* fShader = "                \n\
-#version 330                                  \n\
-                                              \n\
-uniform vec3 triColor;                        \n\
-in vec4 vColor;                               \n\
-out vec4 color;								  \n\
-                                              \n\
-void main(){                                  \n\
-  color = vColor;                             \n\
-}                                             \n\
-";
-
-void AddShader(GLuint shaderProgram, const char* shaderCode, GLenum shaderType) {
-	GLuint _shader = glCreateShader(shaderType);
-
-	const GLchar* code[1];
-	code[0] = shaderCode;
-
-	glShaderSource(_shader, 1, code, NULL);
-	glCompileShader(_shader);
-
-	GLint result = 0;
-	GLchar eLog[1024] = { 0 };
-	glGetShaderiv(_shader, GL_COMPILE_STATUS, &result);
-	if (!result) {
-		glGetProgramInfoLog(_shader, 1024, NULL, eLog);
-		printf("Erro ao compilar %d: %s", shaderType, eLog);
-		return;
-	}
-	glAttachShader(shaderProgram, _shader);
-}
-
-
-
-void CompileShader() {
-	shaderProgram = glCreateProgram();
-	if (!shaderProgram) {
-		printf("O programa não foi iniciado \n");
-		return;
-	}
-
-	AddShader(shaderProgram, vShader, GL_VERTEX_SHADER);
-	AddShader(shaderProgram, fShader, GL_FRAGMENT_SHADER);
-
-	glLinkProgram(shaderProgram);
-}
 
 void CreateTriangle() {
 	GLfloat vertices[] = {
 		-1.0f, -1.0f, 0.0f,  //Vertice 0: (Preto)
 		0.0f, 1.0f, 0.0f,    //Vertice 1: (Verde)
 		1.0f, -1.0f, 0.0f,   //Vertice 2: (Vermelho)
-		0.0f, -1.0f, 1.0f     //Vertice 3: (Azul)
+		0.0f, -1.0f, 1.0f    //Vertice 3: (Azul)
 	};
 
 	GLuint indices[] = {
@@ -94,68 +37,39 @@ void CreateTriangle() {
 	Mesh* obj1 = new Mesh();
 	obj1->CreateMesh(vertices, sizeof(vertices), indices, sizeof(indices));
 	meshList.push_back(obj1);
+
+	Mesh* obj2 = new Mesh();
+	obj2->CreateMesh(vertices, sizeof(vertices), indices, sizeof(indices));
+	meshList.push_back(obj2);
+}
+
+void CreateShader() {
+	Shader* shader = new Shader();
+	shader->CreateFromFile(vertexLocation, fragmentLocation);
+	shaderList.push_back(shader);
 }
 
 
 
+
 int main() {
-	//Caso o GLWF de erro, execute essa função
-	glfwSetErrorCallback(error_glfw);
-
-	if (!glfwInit()) {
-		printf("GLFW Não foi iniciado \n");
-		return -1;
-	}
-
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	GLFWwindow* mainWindow = glfwCreateWindow(800, 600, "Aula 02", NULL, NULL);
-	if (!mainWindow) {
-		printf("GLFW Não consegiu criar a janela\n");
-		glfwTerminate();
-		return -1;
-	}
-
-	glfwMakeContextCurrent(mainWindow);
-
-	int bufferWidth, bufferHeight;
-	glfwGetFramebufferSize(mainWindow, &bufferWidth, &bufferHeight);
-
-	glewExperimental = true;
-	if (glewInit() != GLEW_OK) {
-		printf("Erro ao iniciar o Glew");
-		glfwDestroyWindow(mainWindow);
-		glfwTerminate();
-		return -1;
-	}
-
-	glEnable(GL_DEPTH_TEST);
-	glViewport(0, 0, bufferWidth, bufferHeight);
+	window = new Window(1024, 768);
+	window->Initialize();
 
 	CreateTriangle();
-	CompileShader();
-
+	CreateShader();
 
 	bool direction = true, angleDirection = true, scaleDirection = true;
 	float triOffset = 0.0f, maxOffset = 1.0f, minOffset = -1.0f, incOffset = 0.01f;
 	float angle = 0.0f, maxAngle = 360.0f, minAngle = -0.1f, incAngle = 0.5f;
 	float scale = 0.0f, maxScale = 1.0f, minScale = -1.0f, incScale = 0.01f;
 
-	while (!glfwWindowShouldClose(mainWindow)) {
-		glClearColor(0.8f, 0.2f, 0.5f, 1.0f);
+	while (!window->ShouldClose()) {
+		glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glUseProgram(shaderProgram);
-
-		//Definindo as cores do tringulo
-		//Retorna o endere�o de memoria da placa de video
-		GLuint uniColor = glGetUniformLocation(shaderProgram, "triColor");
-		glUniform3f(uniColor, 0.3f, 0.8f, 0.7f);
-
-		//Matriz 4x4 (1.0f)
-		glm::mat4 model(1.0f);
+		Shader* shader = shaderList[0];
+		shader->UseProgram();
 
 		//Calculo de movimentação
 		if (triOffset >= maxOffset || triOffset <= minOffset)
@@ -172,25 +86,40 @@ int main() {
 			scaleDirection = !scaleDirection;
 		scale += scaleDirection ? incScale : incScale * -1;
 
-		//Movimentação nos eixos
-		//model = glm::translate(model, glm::vec3(-triOffset, triOffset, 0.0f));
-
-		//Movimentação de angulo
-		model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
-
-		model = glm::scale(model, glm::vec3(0.4f, 0.4f, 0.4f));
-
-		GLuint uniModel = glGetUniformLocation(shaderProgram, "model");
-		glUniformMatrix4fv(uniModel, 1, GL_FALSE, glm::value_ptr(model));
-
+		/*
+		* Triangulo 1
+		*/
 		meshList[0]->RenderMesh();
-		
+		//criar uma matriz 4x4 (1.0f)
+		glm::mat4 model(1.0f);
+		model = glm::translate(model, glm::vec3(0.5f, 0.0f, -1.5f)); //Movimentações do triangulo
+		model = glm::scale(model, glm::vec3(0.4, 0.4, 0.4)); //Tamanho do triangulo
+		model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f)); //Rotação
+
+		glUniformMatrix4fv(shader->GetUniformModel(), 1, GL_FALSE, glm::value_ptr(model)); //Envia os dados para o triangulo
+
+		/*
+		* Triangulo 2
+		*/
+		meshList[1]->RenderMesh();
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(-0.5f, 0.0f, -1.5f)); //Movimentações do triangulo
+		model = glm::scale(model, glm::vec3(0.4, 0.4, 0.4)); //Tamanho do triangulo
+		model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, -1.0f, 0.0f)); //Rotação
+		glUniformMatrix4fv(shader->GetUniformModel(), 1, GL_FALSE, glm::value_ptr(model)); //Envia os dados para o triangulo
+
+
+		//Projeção de perspectiva 3D
+		glm::mat4 projection = glm::perspective(1.0f, window->GetBufferWidth() / window->GetBufferHeight(), 0.1f, 100.0f);
+		glUniformMatrix4fv(shader->GetUniformProjection(), 1, GL_FALSE, glm::value_ptr(projection)); //Envia os dados para o triangulo
+
 		glUseProgram(0);
 
-		glfwSwapBuffers(mainWindow);
+		window->SwapBuffers();
+
 		glfwPollEvents();
 	}
 
-	glfwTerminate();
+	window->~Window();
 	return 0;
 }

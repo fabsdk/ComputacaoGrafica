@@ -1,5 +1,4 @@
 #include "GL\glew.h"
-#pragma onde
 class Mesh
 {
 public:
